@@ -80,9 +80,14 @@ export function drawHUD(ctx, G, vw, vh) {
     ctx.fillText('★', vw - 20 - (4 - i) * 26, 38);
   }
   if (G.bust > 0.05) {
-    ctx.font = `700 14px ${FONT}`; ctx.fillStyle = '#ff6b6b'; ctx.textAlign = 'right';
-    ctx.fillText('BUSTED METER', vw - 20, 62);
-    bar(ctx, vw - 190, 68, 170, 9, G.bust, '#ff5252', '#3a2027');
+    // Bust meter: its own dark panel directly under the stars, with a clear
+    // gap below the star row, so the label is fully legible while a bust is
+    // in progress instead of crowding the stars.
+    ctx.fillStyle = 'rgba(12,20,28,0.55)';
+    ctx.fillRect(vw - 212, 50, 200, 38);
+    ctx.font = `700 13px ${FONT}`; ctx.fillStyle = '#ff6b6b'; ctx.textAlign = 'left';
+    ctx.fillText('BUSTED METER', vw - 200, 67);
+    bar(ctx, vw - 200, 73, 176, 8, G.bust, '#ff5252', '#3a2027');
   }
 
   // Objective + timer, top centre.
@@ -126,14 +131,20 @@ export function drawHUD(ctx, G, vw, vh) {
     ctx.fillStyle = '#fff';
     ctx.fillText(G.hint, vw / 2, vh - 132);
   }
-  // Speedometer while driving.
+  // Speedometer while driving: a panel in the right column directly above
+  // the minimap, well clear of the dialogue box at bottom centre, so the
+  // speed number, the km/h unit and the car-damage bar are always fully
+  // visible while dialogue is on screen.
   if (P.car) {
     const kmh = Math.round(Math.abs(P.car.speed) * 0.55);
+    const sx = vw - 216, sy = vh - 230;
+    ctx.fillStyle = 'rgba(12,20,28,0.55)';
+    ctx.fillRect(sx, sy, 204, 50);
     ctx.font = `800 30px ${FONT}`; ctx.fillStyle = '#fff'; ctx.textAlign = 'right';
-    ctx.fillText(`${kmh}`, vw - 235, vh - 46);
-    ctx.font = `600 12px ${FONT}`; ctx.fillStyle = '#cfe3ee';
-    ctx.fillText('km/h', vw - 235, vh - 28);
-    bar(ctx, vw - 330, vh - 22, 90, 7, P.car.health / 100, '#ffa94d', '#333');
+    ctx.fillText(`${kmh}`, sx + 118, sy + 34);
+    ctx.font = `600 12px ${FONT}`; ctx.fillStyle = '#cfe3ee'; ctx.textAlign = 'left';
+    ctx.fillText('km/h', sx + 124, sy + 34);
+    bar(ctx, sx + 12, sy + 40, 180, 6, P.car.health / 100, '#ffa94d', '#333');
   }
   // Minimap bottom-right.
   drawMinimap(ctx, G, vw - 216, vh - 172, 204);
