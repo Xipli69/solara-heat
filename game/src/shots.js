@@ -1,79 +1,87 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+// Solara Heat — screenshot staging. A ?shot=NAME URL freezes a deterministic,
+// rich frame of the real game (same state the loop plays), so the maker's
+// screenshots are honest renders: title, a police chase, a city-centre walk,
+// and a fast coastal drive.
 
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
+import { PLACES } from './config.js';
+import { makeCar } from './vehicles.js';
+import { makePed } from './people.js';
 
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
+export function stageShot(G, name) {
+  const P = G.player;
+  G.frozen = true;
+  if (name === 'title') {
+    G.screen = 'title';
+    P.x = 880; P.y = 900;
+    G.camera.x = P.x - 640; G.camera.y = P.y - 400;
+    return;
+  }
+  G.screen = 'play';
+  if (name === 'chase') {
+    // Cover: mid-chase on a downtown avenue, mission 4 heat.
+    G.missions.state.index = 3;
+    G.missions.startMission(3);
+    G.missions.state.stage = 'lose';
+    G.missions.say(['Cousin: Drive, primo, DRIVE!', 'Marisol: Lose the heat, then the safehouse.']);
+    const car = makeCar(1400, 900, 0, '#f39c12', 'civilian');
+    car.speed = 210; car.health = 62;
+    G.cars.push(car);
+    P.car = car; P.x = car.x; P.y = car.y; P.angle = 0;
+    G.setWanted(3, true);
+    for (let i = 0; i < 3; i++) {
+      const cop = makeCar(1400 - 150 - i * 95, 900 + (i % 2 ? 34 : -30), 0, '#2b3a55', 'police');
+      cop.speed = 200; cop.health = 130;
+      G.cars.push(cop);
+      G.peds.push(Object.assign(makePed(cop.x, cop.y + 20, '#33507e', 'cop'), { carRef: cop }));
     }
+    const traffic = makeCar(1620, 934, 0, '#3498db', 'traffic');
+    traffic.speed = 110; G.cars.push(traffic);
+    for (let i = 0; i < 30; i++) G.skids.push({ x: 1400 - 40 - i * 13, y: 918 + Math.sin(i) * 3, life: 6 });
+    G.skids.push({ x: 1355, y: 922, life: 6 });
+    G.floaters.push({ x: 1330, y: 830, text: 'WANTED', color: '#ff6b6b', life: 1 });
+    P.muzzle = 0.2;
+    G.bust = 0.25;
+  } else if (name === 'foot') {
+    // On foot in the centre: pedestrians, signs, palms, first mission marker.
+    G.missions.startMission(0);
+    P.x = 700; P.y = 950; P.angle = -0.5;
+    P.car = null;
+    const spots = [[700, 782], [800, 940], [600, 940], [950, 782], [520, 782], [1010, 940], [806, 700]];
+    spots.forEach(([x, y], i) => {
+      const ped = makePed(x, y, ['#e91e63', '#00bcd4', '#8bc34a', '#ff9800', '#ba68c8', '#fff176'][i], 'ped');
+      ped.angle = i * 1.1;
+      G.peds.push(ped);
+    });
+    const parked = makeCar(790, 800, Math.PI / 2, '#2ecc71', 'parked');
+    G.cars.push(parked);
+  } else if (name === 'drive') {
+    // Coastal run: fast on the beach road with traffic and the sea beside.
+    G.missions.state.index = 5;
+    G.missions.startMission(5);
+    G.missions.state.stage = 'run';
+    G.missions.say(['Nico: Ledger is mine. Time to fly.']);
+    const car = makeCar(2440, 1500, Math.PI / 2, '#e74c3c', 'civilian');
+    car.speed = 300; car.health = 88;
+    G.cars.push(car);
+    P.car = car; P.x = car.x; P.y = car.y; P.angle = Math.PI / 2;
+    const t1 = makeCar(2440 + 34, 1180, Math.PI / 2, '#ecf0f1', 'traffic'); t1.speed = 130; G.cars.push(t1);
+    const t2 = makeCar(2440 - 34, 1900, -Math.PI / 2, '#9b59b6', 'traffic'); t2.speed = 120; G.cars.push(t2);
+    for (let i = 0; i < 22; i++) G.skids.push({ x: 2432, y: 1500 - 30 - i * 12, life: 6 });
+    G.setWanted(2, true);
+    const cop = makeCar(2440, 1300, Math.PI / 2, '#2b3a55', 'police');
+    cop.speed = 260; cop.health = 130; G.cars.push(cop);
+    G.floaters.push({ x: 2380, y: 1400, text: 'ESCAPE!', color: '#ffd166', life: 1 });
+  } else {
+    // Fallback: a quiet start-of-game frame at the spawn corner.
+    P.x = PLACES.start.x; P.y = PLACES.start.y;
+    G.missions.startMission(0);
   }
-  return Infinity;
-}
-
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
+  G.syncCamera(true);
+  // Settle one rendered frame's worth of particles for texture.
+  for (let i = 0; i < 14; i++) {
+    G.particles.push({
+      x: P.x + (G.rnd() - 0.5) * 200, y: P.y + (G.rnd() - 0.5) * 140,
+      vx: 0, vy: -12, life: 0.8, max: 0.8, color: '#fff3b0', size: 2,
+    });
   }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
-    }
-  }
-  return best;
-}
-
-/**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
- */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
-  }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
-  }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
 }
